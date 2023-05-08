@@ -163,3 +163,5 @@ cython_debug/
 data/
 
 brain-tumor-mri-images-44c/
+
+resized_images/
