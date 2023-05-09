@@ -6,7 +6,7 @@ from PIL import Image
 import cv2
 #import tf.models as tfm
 #import tensorflow_models as tfm
-
+import tensorflow_hub as hub
 
 data_list = []
 normal_list = []
@@ -62,7 +62,7 @@ print("len of val", len(val))
 print("len of test", len(test))
 
 
-# CREATE FIRST FOLDERS: training_data and validation data:
+# CREATE FIRST FOLDERS: training_data and validation_data:
 
 def create_files(file_names, folder_path):
     path_extract = "resized_images/"
@@ -107,15 +107,13 @@ def create_files(file_names, folder_path):
 
 
 
+# STEP 1: Read data from directory:
 
-
-# Apparently tf creates classes in an alphanumeric fashion.
 train_ds = tf.keras.utils.image_dataset_from_directory(
     directory='training_data/',
     labels='inferred',
     label_mode='categorical',
     batch_size=32,
-    #batch_size=len(train),
     image_size=(224, 224))
 
 
@@ -124,40 +122,15 @@ validation_ds = tf.keras.utils.image_dataset_from_directory(
     labels='inferred',
     label_mode='categorical',
     batch_size=32,
-    #batch_size=len(val),
     image_size=(224, 224))
 
-# This tries to imitate the way tf builds classes [not 100% sure it is correct]
 
-def get_classes(folder_path):
-    filenames = os.listdir(folder_path)
-    sorted_files = sorted(filenames)
-    # This is to exclude: '.DS_Store':
-    return [f for f in sorted_files if not f.startswith('.')]
-    #return sorted(filenames)
-
-print(get_classes('training_data/'))
-
-class_names = get_classes('training_data/')
-# Seems like this does the trick (for some reason, it was not working)
 class_names = np.array(train_ds.class_names)
 print("class names", class_names)
 
-# Show the first nine images and labels from the training set:
-## following steps in: https://www.tensorflow.org/tutorials/images/transfer_learning
-
-# plt.figure(figsize=(10, 10))
-# for images, labels in train_ds.take(1):
-#     for i in range(9):
-#         ax = plt.subplot(3, 3, i + 1)
-#         plt.imshow(images[i].numpy().astype("uint8"))
-#         #print("labels", class_names[tf.math.argmax(labels[i])])
-#         plt.title(class_names[tf.math.argmax(labels[i])])
-#         plt.axis("off")
-# plt.show()
 
 
-# Create test data:
+# STEP 2: Create test data:
 val_batches = tf.data.experimental.cardinality(validation_ds)
 print('Number of val batches: %d' % val_batches)
 test_dataset = validation_ds.take(val_batches // 5)
@@ -167,8 +140,7 @@ print('Number of validation batches: %d' % tf.data.experimental.cardinality(vali
 print('Number of test batches: %d' % tf.data.experimental.cardinality(test_dataset))
 
 
-# NORMALIZE DATA:
-
+# STEP 3: Normalize data:
 normalization_layer = tf.keras.layers.Rescaling(1./255)
 train_ds = train_ds.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
 val_ds = validation_data.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
@@ -180,18 +152,12 @@ AUTOTUNE = tf.data.AUTOTUNE
 #val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
 
 
-# Download the classifer:
-
+# STEP 4: Get pre-trained models from this link:
 mobilenet_v2 ="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification/4"
 inception_v3 = "https://tfhub.dev/google/imagenet/inception_v3/classification/5"
 resnet50 = "https://tfhub.dev/tensorflow/resnet_50/classification/1"
-classifier_model = resnet50
 
 IMAGE_SHAPE = (224, 224)
-import tensorflow_hub as hub
-
-
-# Download the headless model:
 
 feature_extractor_model = resnet50
 
@@ -200,12 +166,7 @@ feature_extractor_model,
 #input_shape=(224, 224, 3),
 trainable=False)
 
-# for image_batch, labels_batch in train_ds:
-#
-#   feature_batch = feature_extractor_layer(image_batch)
-#
-
-# Attach a classification head:
+# STEP 5: Build Model:
 num_classes = len(class_names)
 
 model = tf.keras.Sequential([
@@ -213,60 +174,65 @@ model = tf.keras.Sequential([
         feature_extractor_layer,
         tf.keras.layers.Dropout(0.2),
         tf.keras.layers.Dense(512, activation='relu'),
-        tf.keras.layers.Dense(256, activation='relu'),
+        #tf.keras.layers.Dense(256, activation='relu'),
         tf.keras.layers.Dense(44, dtype=tf.float32, activation='softmax')
   ])
 
 model.summary()
 
-# for image_batch, labels_batch in train_ds:
-#     predictions = model(image_batch)
-#     print("predictions shape", predictions.shape)
-#     break
-
-# Train the model:
-
+# STEP 6: Compile the model:
 model.compile(
-  optimizer=tf.keras.optimizers.Adam(learning_rate=0.01),
-  #loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
+    #loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
      #loss='categorical_crossentropy',
-loss=tf.keras.losses.CategoricalCrossentropy(),
-  metrics=['acc'])
+    loss=tf.keras.losses.CategoricalCrossentropy(),
+    metrics=['acc'])
 
-NUM_EPOCHS = 20
+NUM_EPOCHS = 40
 
+# STEP 7: Fit the model:
 history = model.fit(train_ds,
-                   validation_data=val_ds,
+                    validation_data=val_ds,
                     epochs=NUM_EPOCHS)
 
-
+# STEP 8: Evaluate:
 print(model.evaluate(test_ds))
 
+#lr=0.01
+# Epoch 20/20
+# 112/112 [==============================] - 130s 1s/step - loss: 0.7740 - acc: 0.7400 - val_loss: 1.7613 - val_acc: 0.6005
+# Test loss and acc: [2.276601552963257, 0.578125]
+
+# 40 epochs: lr=0.01
+# Epoch 40/40
+# 112/112 [==============================] - 137s 1s/step - loss: 0.4745 - acc: 0.8419 - val_loss: 2.1517 - val_acc: 0.6188
+# Test: [1.7676501274108887, 0.59375]
+
+
+
+# STEP 9: Plot loss and accuracies:
+from matplotlib import pyplot as plt
+
+plt.plot(history.history['acc'])
+plt.plot(history.history['val_acc'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'val'], loc='upper left')
+plt.show()
+
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('model loss')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train', 'val'], loc='upper left')
+plt.show()
 
 
 
 
-# To load a single batch:
-# for image_batch, labels_batch in train_ds:
-#     x_train = image_batch.numpy()
-#     y_train = labels_batch.numpy()
-#     break
-#
-# for image_batch, labels_batch in validation_ds:
-#     x_val = image_batch.numpy()
-#     y_val = labels_batch.numpy()
-#     break
-#
-# print("x_train", len(x_train))
-# print("y_train", len(y_train))
-#
-# print("x_train", x_train[1].shape)
-#print("y_train", y_train.shape())
-
-
-
-
-# USE https://www.tensorflow.org/tutorials/images/transfer_learning_with_hub
+# USE:  https://www.tensorflow.org/tutorials/images/transfer_learning_with_hub
 
 # useful tutorial, another model: https://www.kaggle.com/code/bulentsiyah/dogs-vs-cats-classification-vgg16-fine-tuning
 
