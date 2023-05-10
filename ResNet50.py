@@ -147,7 +147,7 @@ def delete_folders_with_few_images(path_to_training: str, path_to_valid: str):
 
 # STEP 1: Read data from directory:
 train_ds = tf.keras.utils.image_dataset_from_directory(
-    directory='training_data_2/',
+    directory='training_data/',
     labels='inferred',
     label_mode='categorical',
     batch_size=32,
@@ -155,7 +155,7 @@ train_ds = tf.keras.utils.image_dataset_from_directory(
 
 
 validation_ds = tf.keras.utils.image_dataset_from_directory(
-    directory='validation_data_2/',
+    directory='validation_data/',
     labels='inferred',
     label_mode='categorical',
     batch_size=32,
@@ -270,12 +270,12 @@ model.compile(
 NUM_EPOCHS = 20
 
 # STEP 7: Fit the model:
-history = model.fit(train_ds,
-                    validation_data=val_ds,
-                    epochs=NUM_EPOCHS)
+#history = model.fit(train_ds,
+#                    validation_data=val_ds,
+#                    epochs=NUM_EPOCHS)
 
 # STEP 8: Evaluate:
-print(model.evaluate(test_ds))
+#print(model.evaluate(test_ds))
 
 # lr=0.01
 # Epoch 20/20
