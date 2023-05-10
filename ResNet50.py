@@ -7,6 +7,9 @@ import cv2
 #import tf.models as tfm
 #import tensorflow_models as tfm
 import tensorflow_hub as hub
+from typing import *
+from tqdm import tqdm
+import shutil
 
 data_list = []
 normal_list = []
@@ -53,7 +56,7 @@ def store_train_val(data_list, normal_list, train_prop, val_prop, test_prop):
     return train_list, val_list, test_list
 
 
-train, val, test = store_train_val(data_list, normal_list, 0.8, 0.1, 0.1)
+train, val, test = store_train_val(data_list, normal_list, 0.8, 0.2, 0.0)
 
 
 
@@ -92,6 +95,41 @@ def create_files(file_names, folder_path):
 
     return
 
+# Run this on a newly created training data folder:
+def delete_folders_with_few_images(path_to_training: str, path_to_valid: str):
+    categories_to_remove = []
+    if not os.path.exists(path_to_training):
+        print('Path does not exist')
+
+    folders: List[str] = os.listdir(path_to_training)
+
+    for folder_name in tqdm(folders):
+        folder_name: str
+
+        folder_path: str = os.path.join(path_to_training, folder_name)
+
+        if os.path.isdir(folder_path):
+            files: List[str] = os.listdir(folder_path)
+            #print("len files", len(files))
+            if len(files) < 20:
+
+                #os.rmdir(folder_path)
+
+                shutil.rmtree(folder_path, ignore_errors=True)
+                categories_to_remove.append(folder_name)
+
+    folders_in_val = os.listdir(path_to_valid)
+    for folder_name in tqdm(folders):
+        if folder_name in categories_to_remove:
+            folder_path = os.path.join(path_to_valid, folder_name)
+            #os.rmdir(folder_path)
+            shutil.rmtree(folder_path, ignore_errors=True)
+    print("categories to remove", categories_to_remove)
+    return
+
+
+#categories_to_remove = delete_folders_with_few_images('training_data_2/','validation_data_2/' )
+
 
 
 
@@ -110,7 +148,7 @@ def create_files(file_names, folder_path):
 # STEP 1: Read data from directory:
 
 train_ds = tf.keras.utils.image_dataset_from_directory(
-    directory='training_data/',
+    directory='training_data_2/',
     labels='inferred',
     label_mode='categorical',
     batch_size=32,
@@ -118,7 +156,7 @@ train_ds = tf.keras.utils.image_dataset_from_directory(
 
 
 validation_ds = tf.keras.utils.image_dataset_from_directory(
-    directory='validation_data/',
+    directory='validation_data_2/',
     labels='inferred',
     label_mode='categorical',
     batch_size=32,
@@ -148,10 +186,11 @@ augmentation_layer = tf.keras.Sequential([
 
 # STEP 3: Normalize data:
 normalization_layer = tf.keras.layers.Rescaling(1./255)
-train_ds = train_ds.map(lambda x, y: (augmentation_layer(normalization_layer(x)), y)) # Where x—images, y—labels.
-val_ds = validation_data.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
-test_ds = test_dataset.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
-
+#train_ds = train_ds.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
+#val_ds = validation_data.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
+#test_ds = test_dataset.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
+val_ds = validation_data
+test_ds = test_dataset
 
 AUTOTUNE = tf.data.AUTOTUNE
 #train_ds = train_ds.cache().prefetch(buffer_size=AUTOTUNE)
@@ -165,7 +204,13 @@ resnet50 = "https://tfhub.dev/tensorflow/resnet_50/classification/1"
 resnet50_v2 = 'https://tfhub.dev/google/imagenet/resnet_v2_50/classification/5'
 IMAGE_SHAPE = (224, 224)
 
-feature_extractor_model = resnet50_v2
+feature_extractor_model = resnet50
+
+base_model = tf.keras.applications.ResNetRS152(input_shape=(224, 224, 3),
+                                               include_top=False,
+                                               weights='imagenet')
+
+base_model.trainable = True
 
 
 feature_extractor_layer = hub.KerasLayer(
@@ -173,16 +218,35 @@ feature_extractor_model,
 #input_shape=(224, 224, 3),
 trainable=False)
 
+
+#feature_extractor_model.summary()
+
+# Fine-tune from this layer onwards
+fine_tune_at = 100
+
+# Freeze all the layers before the `fine_tune_at` layer
+for layer in base_model.layers[:fine_tune_at]:
+    layer.trainable = False
+
+global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
+
+
 # STEP 5: Build Model:
 num_classes = len(class_names)
 #initializer = tf.keras.initializers.GlorotNormal(seed=31)
+
+preprocess_input = tf.keras.applications.resnet50.preprocess_input
+#x = preprocess_input(train_ds)
+
 model = tf.keras.Sequential([
         tf.keras.layers.Input(shape=(224, 224, 3), dtype=tf.float32, name='input_image'),
-        feature_extractor_layer,
+        #feature_extractor_layer,
+        base_model,
+        global_average_layer,
         tf.keras.layers.Dropout(0.2),
         tf.keras.layers.Dense(512, activation='relu'),
         tf.keras.layers.Dense(256, activation='relu'),
-        tf.keras.layers.Dense(44, dtype=tf.float32, activation='softmax')
+        tf.keras.layers.Dense(num_classes, dtype=tf.float32, activation='softmax')
   ])
 
 model.summary()
@@ -195,7 +259,7 @@ lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
 #optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule)
 
 model.compile(
-    optimizer=tf.keras.optimizers.Adam(learning_rate=0.01),
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
     #loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
      #loss='categorical_crossentropy',
     loss=tf.keras.losses.CategoricalCrossentropy(),
@@ -222,29 +286,29 @@ print(model.evaluate(test_ds))
 # Test: [1.7676501274108887, 0.59375]
 
 
-
-# STEP 9: Plot loss and accuracies:
-from matplotlib import pyplot as plt
-
-plt.plot(history.history['acc'])
-plt.plot(history.history['val_acc'])
-plt.title('model accuracy')
-plt.ylabel('accuracy')
-plt.xlabel('epoch')
-plt.legend(['train', 'val'], loc='upper left')
-plt.show()
-
-plt.plot(history.history['loss'])
-plt.plot(history.history['val_loss'])
-plt.title('model loss')
-plt.ylabel('loss')
-plt.xlabel('epoch')
-plt.legend(['train', 'val'], loc='upper left')
-plt.show()
-
-
-
-
+#
+# # STEP 9: Plot loss and accuracies:
+# from matplotlib import pyplot as plt
+#
+# plt.plot(history.history['acc'])
+# plt.plot(history.history['val_acc'])
+# plt.title('model accuracy')
+# plt.ylabel('accuracy')
+# plt.xlabel('epoch')
+# plt.legend(['train', 'val'], loc='upper left')
+# plt.show()
+#
+# plt.plot(history.history['loss'])
+# plt.plot(history.history['val_loss'])
+# plt.title('model loss')
+# plt.ylabel('loss')
+# plt.xlabel('epoch')
+# plt.legend(['train', 'val'], loc='upper left')
+# plt.show()
+#
+#
+#
+#
 # USE:  https://www.tensorflow.org/tutorials/images/transfer_learning_with_hub
 
 # useful tutorial, another model: https://www.kaggle.com/code/bulentsiyah/dogs-vs-cats-classification-vgg16-fine-tuning

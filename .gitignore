@@ -165,3 +165,8 @@ data/
 brain-tumor-mri-images-44c/
 
 resized_images/
+
+training_data/
+training_data_2/
+validation_data/
+validation_data_2/
