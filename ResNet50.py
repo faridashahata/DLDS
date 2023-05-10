@@ -139,10 +139,16 @@ validation_data = validation_ds.skip(val_batches // 5)
 print('Number of validation batches: %d' % tf.data.experimental.cardinality(validation_data))
 print('Number of test batches: %d' % tf.data.experimental.cardinality(test_dataset))
 
+# Build Augmentation layer:
+
+augmentation_layer = tf.keras.Sequential([
+    tf.keras.layers.RandomFlip(mode='horizontal')
+], name='augmentation_layer')
+
 
 # STEP 3: Normalize data:
 normalization_layer = tf.keras.layers.Rescaling(1./255)
-train_ds = train_ds.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
+train_ds = train_ds.map(lambda x, y: (augmentation_layer(normalization_layer(x)), y)) # Where x—images, y—labels.
 val_ds = validation_data.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
 test_ds = test_dataset.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
 
@@ -156,10 +162,11 @@ AUTOTUNE = tf.data.AUTOTUNE
 mobilenet_v2 ="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification/4"
 inception_v3 = "https://tfhub.dev/google/imagenet/inception_v3/classification/5"
 resnet50 = "https://tfhub.dev/tensorflow/resnet_50/classification/1"
-
+resnet50_v2 = 'https://tfhub.dev/google/imagenet/resnet_v2_50/classification/5'
 IMAGE_SHAPE = (224, 224)
 
-feature_extractor_model = resnet50
+feature_extractor_model = resnet50_v2
+
 
 feature_extractor_layer = hub.KerasLayer(
 feature_extractor_model,
@@ -168,27 +175,33 @@ trainable=False)
 
 # STEP 5: Build Model:
 num_classes = len(class_names)
-
+#initializer = tf.keras.initializers.GlorotNormal(seed=31)
 model = tf.keras.Sequential([
         tf.keras.layers.Input(shape=(224, 224, 3), dtype=tf.float32, name='input_image'),
         feature_extractor_layer,
         tf.keras.layers.Dropout(0.2),
         tf.keras.layers.Dense(512, activation='relu'),
-        #tf.keras.layers.Dense(256, activation='relu'),
+        tf.keras.layers.Dense(256, activation='relu'),
         tf.keras.layers.Dense(44, dtype=tf.float32, activation='softmax')
   ])
 
 model.summary()
 
 # STEP 6: Compile the model:
+lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+    initial_learning_rate=1e-2,
+    decay_steps=10000,
+    decay_rate=0.9)
+#optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule)
+
 model.compile(
-    optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.01),
     #loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
      #loss='categorical_crossentropy',
     loss=tf.keras.losses.CategoricalCrossentropy(),
     metrics=['acc'])
 
-NUM_EPOCHS = 40
+NUM_EPOCHS = 20
 
 # STEP 7: Fit the model:
 history = model.fit(train_ds,
