@@ -17,7 +17,8 @@ with open('data_list.txt', 'r') as f:
     for line in f:
         image_list = line.split(";")
         if "_NORMAL" in image_list[1]:
-            normal_list.append([image_list[0], image_list[1].replace('\n', '')])
+            normal_list.append(
+                [image_list[0], image_list[1].replace('\n', '')])
         else:
             data_list.append([image_list[0], image_list[1].replace('\n', '')])
 
@@ -45,8 +46,10 @@ def store_train_val(data_list, normal_list, train_prop, val_prop, test_prop):
     train_list_normal = normal_list[:train_lim_normal]
     train_list = [*train_list_unnormal, *train_list_normal]
 
-    val_list_unnormal = data_list[train_lim_unnormal:train_lim_unnormal + val_lim_unnormal]
-    val_list_normal = normal_list[train_lim_normal:train_lim_normal + val_lim_normal]
+    val_list_unnormal = data_list[train_lim_unnormal:
+                                  train_lim_unnormal + val_lim_unnormal]
+    val_list_normal = normal_list[train_lim_normal:
+                                  train_lim_normal + val_lim_normal]
     val_list = [*val_list_unnormal, *val_list_normal]
 
     test_list_unnormal = data_list[train_lim_unnormal + val_lim_unnormal:]
@@ -57,7 +60,6 @@ def store_train_val(data_list, normal_list, train_prop, val_prop, test_prop):
 
 
 train, val, test = store_train_val(data_list, normal_list, 0.8, 0.2, 0.0)
-
 
 
 print("len of train", len(train))
@@ -73,7 +75,7 @@ def create_files(file_names, folder_path):
     #new_path = 'training_data/'
     new_path = folder_path
 
-    #instead of file_names, put train, val or test:
+    # instead of file_names, put train, val or test:
     for image in file_names:
         image_name = image[0]
         image_class = image[1]
@@ -96,6 +98,8 @@ def create_files(file_names, folder_path):
     return
 
 # Run this on a newly created training data folder:
+
+
 def delete_folders_with_few_images(path_to_training: str, path_to_valid: str):
     categories_to_remove = []
     if not os.path.exists(path_to_training):
@@ -113,7 +117,7 @@ def delete_folders_with_few_images(path_to_training: str, path_to_valid: str):
             #print("len files", len(files))
             if len(files) < 20:
 
-                #os.rmdir(folder_path)
+                # os.rmdir(folder_path)
 
                 shutil.rmtree(folder_path, ignore_errors=True)
                 categories_to_remove.append(folder_name)
@@ -122,15 +126,13 @@ def delete_folders_with_few_images(path_to_training: str, path_to_valid: str):
     for folder_name in tqdm(folders):
         if folder_name in categories_to_remove:
             folder_path = os.path.join(path_to_valid, folder_name)
-            #os.rmdir(folder_path)
+            # os.rmdir(folder_path)
             shutil.rmtree(folder_path, ignore_errors=True)
     print("categories to remove", categories_to_remove)
     return
 
 
 #categories_to_remove = delete_folders_with_few_images('training_data_2/','validation_data_2/' )
-
-
 
 
 # Run the following lines once (alternatively clear files for different runs/draws of data splits):
@@ -143,10 +145,7 @@ def delete_folders_with_few_images(path_to_training: str, path_to_valid: str):
 # print(len(os.listdir(new_path)))
 
 
-
-
 # STEP 1: Read data from directory:
-
 train_ds = tf.keras.utils.image_dataset_from_directory(
     directory='training_data_2/',
     labels='inferred',
@@ -167,15 +166,16 @@ class_names = np.array(train_ds.class_names)
 print("class names", class_names)
 
 
-
 # STEP 2: Create test data:
 val_batches = tf.data.experimental.cardinality(validation_ds)
 print('Number of val batches: %d' % val_batches)
 test_dataset = validation_ds.take(val_batches // 5)
 validation_data = validation_ds.skip(val_batches // 5)
 
-print('Number of validation batches: %d' % tf.data.experimental.cardinality(validation_data))
-print('Number of test batches: %d' % tf.data.experimental.cardinality(test_dataset))
+print('Number of validation batches: %d' %
+      tf.data.experimental.cardinality(validation_data))
+print('Number of test batches: %d' %
+      tf.data.experimental.cardinality(test_dataset))
 
 # Build Augmentation layer:
 
@@ -186,9 +186,9 @@ augmentation_layer = tf.keras.Sequential([
 
 # STEP 3: Normalize data:
 normalization_layer = tf.keras.layers.Rescaling(1./255)
-#train_ds = train_ds.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
-#val_ds = validation_data.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
-#test_ds = test_dataset.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
+# train_ds = train_ds.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
+# val_ds = validation_data.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
+# test_ds = test_dataset.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
 val_ds = validation_data
 test_ds = test_dataset
 
@@ -198,7 +198,7 @@ AUTOTUNE = tf.data.AUTOTUNE
 
 
 # STEP 4: Get pre-trained models from this link:
-mobilenet_v2 ="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification/4"
+mobilenet_v2 = "https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification/4"
 inception_v3 = "https://tfhub.dev/google/imagenet/inception_v3/classification/5"
 resnet50 = "https://tfhub.dev/tensorflow/resnet_50/classification/1"
 resnet50_v2 = 'https://tfhub.dev/google/imagenet/resnet_v2_50/classification/5'
@@ -214,12 +214,12 @@ base_model.trainable = True
 
 
 feature_extractor_layer = hub.KerasLayer(
-feature_extractor_model,
-#input_shape=(224, 224, 3),
-trainable=False)
+    feature_extractor_model,
+    #input_shape=(224, 224, 3),
+    trainable=False)
 
 
-#feature_extractor_model.summary()
+# feature_extractor_model.summary()
 
 # Fine-tune from this layer onwards
 fine_tune_at = 100
@@ -235,19 +235,21 @@ global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
 num_classes = len(class_names)
 #initializer = tf.keras.initializers.GlorotNormal(seed=31)
 
-preprocess_input = tf.keras.applications.resnet50.preprocess_input
+# preprocess_input = tf.keras.applications.resnet50.preprocess_input
 #x = preprocess_input(train_ds)
 
 model = tf.keras.Sequential([
-        tf.keras.layers.Input(shape=(224, 224, 3), dtype=tf.float32, name='input_image'),
-        #feature_extractor_layer,
-        base_model,
-        global_average_layer,
-        tf.keras.layers.Dropout(0.2),
-        tf.keras.layers.Dense(512, activation='relu'),
-        tf.keras.layers.Dense(256, activation='relu'),
-        tf.keras.layers.Dense(num_classes, dtype=tf.float32, activation='softmax')
-  ])
+    tf.keras.layers.Input(shape=(224, 224, 3),
+                          dtype=tf.float32, name='input_image'),
+    # feature_extractor_layer,
+    base_model,
+    global_average_layer,
+    tf.keras.layers.Dropout(0.2),
+    tf.keras.layers.Dense(512, activation='relu'),
+    tf.keras.layers.Dense(256, activation='relu'),
+    tf.keras.layers.Dense(
+        num_classes, dtype=tf.float32, activation='softmax')
+])
 
 model.summary()
 
@@ -260,8 +262,8 @@ lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
 
 model.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
-    #loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-     #loss='categorical_crossentropy',
+    # loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+    # loss='categorical_crossentropy',
     loss=tf.keras.losses.CategoricalCrossentropy(),
     metrics=['acc'])
 
@@ -275,7 +277,7 @@ history = model.fit(train_ds,
 # STEP 8: Evaluate:
 print(model.evaluate(test_ds))
 
-#lr=0.01
+# lr=0.01
 # Epoch 20/20
 # 112/112 [==============================] - 130s 1s/step - loss: 0.7740 - acc: 0.7400 - val_loss: 1.7613 - val_acc: 0.6005
 # Test loss and acc: [2.276601552963257, 0.578125]
