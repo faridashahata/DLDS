@@ -59,17 +59,17 @@ def store_train_val(data_list, normal_list, train_prop, val_prop, test_prop):
     return train_list, val_list, test_list
 
 
-train, val, test = store_train_val(data_list, normal_list, 0.8, 0.2, 0.0)
+#train, val, test = store_train_val(data_list, normal_list, 0.8, 0.2, 0.0)
 
-
-print("len of train", len(train))
-print("len of val", len(val))
-print("len of test", len(test))
+#
+# print("len of train", len(train))
+# print("len of val", len(val))
+# print("len of test", len(test))
 
 
 # CREATE FIRST FOLDERS: training_data and validation_data:
 
-def create_files(file_names, folder_path):
+def create_files_binary(file_names, folder_path):
     path_extract = "resized_images/"
     filenames = os.listdir(path_extract)
     #new_path = 'training_data/'
@@ -79,9 +79,14 @@ def create_files(file_names, folder_path):
     for image in file_names:
         image_name = image[0]
         image_class = image[1]
-
         im_path = os.path.join(path_extract, image_class, image_name)
-        new_folder_path = os.path.join(new_path, image_class)
+        if "_NORMAL" in image_class:
+            print("image class", image_class)
+            bin_image_class = "NORMAL"
+            new_folder_path = os.path.join(new_path, bin_image_class)
+        else:
+            bin_image_class = "TUMOR"
+            new_folder_path = os.path.join(new_path, bin_image_class)
 
         if not os.path.exists(new_folder_path):
             os.makedirs(new_folder_path)
@@ -89,65 +94,23 @@ def create_files(file_names, folder_path):
         image_file = cv2.imread(im_path)
         cv2.imwrite(new_im_path, image_file)
 
-    # Make sure the folder contains a file for each of the 44 categories:
-    for file in filenames:
-        new_folder_path = os.path.join(new_path, file)
-        if not os.path.exists(new_folder_path):
-            os.makedirs(new_folder_path)
+    # # Make sure the folder contains a file for each of the 44 categories:
+    # for file in filenames:
+    #     new_folder_path = os.path.join(new_path, file)
+    #     if not os.path.exists(new_folder_path):
+    #         os.makedirs(new_folder_path)
 
     return
-
-# Run this on a newly created training data folder:
-
-
-def delete_folders_with_few_images(path_to_training: str, path_to_valid: str):
-    categories_to_remove = []
-    if not os.path.exists(path_to_training):
-        print('Path does not exist')
-
-    folders: List[str] = os.listdir(path_to_training)
-
-    for folder_name in tqdm(folders):
-        folder_name: str
-
-        folder_path: str = os.path.join(path_to_training, folder_name)
-
-        if os.path.isdir(folder_path):
-            files: List[str] = os.listdir(folder_path)
-            #print("len files", len(files))
-            if len(files) < 20:
-
-                # os.rmdir(folder_path)
-
-                shutil.rmtree(folder_path, ignore_errors=True)
-                categories_to_remove.append(folder_name)
-
-    folders_in_val = os.listdir(path_to_valid)
-    for folder_name in tqdm(folders):
-        if folder_name in categories_to_remove:
-            folder_path = os.path.join(path_to_valid, folder_name)
-            # os.rmdir(folder_path)
-            shutil.rmtree(folder_path, ignore_errors=True)
-    print("categories to remove", categories_to_remove)
-    return
-
-
-#categories_to_remove = delete_folders_with_few_images('training_data_2/','validation_data_2/' )
-
 
 # Run the following lines once (alternatively clear files for different runs/draws of data splits):
-#create_files(train, 'training_data/')
-#create_files(val, 'validation_data/')
+#create_files_binary(train, 'training_data_binary/')
+#create_files_binary(val, 'val_data_binary/')
 
-
-# This is to check if a file is empty or not incase we want to either repopulate it or delete its contents for new runs
-# print(os.path.getsize(new_path) == 0)
-# print(len(os.listdir(new_path)))
 
 
 # STEP 1: Read data from directory:
 train_ds = tf.keras.utils.image_dataset_from_directory(
-    directory='training_data/',
+    directory='training_data_binary/',
     labels='inferred',
     label_mode='categorical',
     batch_size=32,
@@ -155,7 +118,7 @@ train_ds = tf.keras.utils.image_dataset_from_directory(
 
 
 validation_ds = tf.keras.utils.image_dataset_from_directory(
-    directory='validation_data/',
+    directory='val_data_binary/',
     labels='inferred',
     label_mode='categorical',
     batch_size=32,
@@ -177,11 +140,6 @@ print('Number of validation batches: %d' %
 print('Number of test batches: %d' %
       tf.data.experimental.cardinality(test_dataset))
 
-# Build Augmentation layer:
-
-augmentation_layer = tf.keras.Sequential([
-    tf.keras.layers.RandomFlip(mode='horizontal')
-], name='augmentation_layer')
 
 
 # STEP 3: Normalize data:
@@ -192,9 +150,6 @@ normalization_layer = tf.keras.layers.Rescaling(1./255)
 val_ds = validation_data
 test_ds = test_dataset
 
-AUTOTUNE = tf.data.AUTOTUNE
-#train_ds = train_ds.cache().prefetch(buffer_size=AUTOTUNE)
-#val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
 
 
 # STEP 4: Get pre-trained models from this link:
@@ -204,26 +159,26 @@ resnet50 = "https://tfhub.dev/tensorflow/resnet_50/classification/1"
 resnet50_v2 = 'https://tfhub.dev/google/imagenet/resnet_v2_50/classification/5'
 IMAGE_SHAPE = (224, 224)
 
-feature_extractor_model = resnet50
+#feature_extractor_model = resnet50
 #ResNetRS152
-base_model = tf.keras.applications.ResNetRS152(input_shape=(224, 224, 3),
+base_model = tf.keras.applications.resnet50.ResNet50(input_shape=(224, 224, 3),
                                                include_top=False,
                                                weights='imagenet')
 
 base_model.trainable = True
 
-
-feature_extractor_layer = hub.KerasLayer(
-    feature_extractor_model,
-    #input_shape=(224, 224, 3),
-    trainable=False)
+#
+# feature_extractor_layer = hub.KerasLayer(
+#     feature_extractor_model,
+#     #input_shape=(224, 224, 3),
+#     trainable=False)
 
 
 # feature_extractor_model.summary()
 
 # Fine-tune from this layer onwards
-fine_tune_at = 100
-#fine_tune_at = 70
+fine_tune_at = 45
+#fine_tune_at = 90
 
 # Freeze all the layers before the `fine_tune_at` layer
 for layer in base_model.layers[:fine_tune_at]:
@@ -245,9 +200,10 @@ model = tf.keras.Sequential([
     # feature_extractor_layer,
     base_model,
     global_average_layer,
-    tf.keras.layers.Dropout(0.2),
-    tf.keras.layers.Dense(512, activation='relu'),
+    #tf.keras.layers.Dropout(0.5),
+    #tf.keras.layers.Dense(512, activation='relu'),
     tf.keras.layers.Dense(256, activation='relu'),
+
     tf.keras.layers.Dense(
         num_classes, dtype=tf.float32, activation='softmax')
 ])
@@ -256,19 +212,21 @@ model.summary()
 
 # STEP 6: Compile the model:
 lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-    initial_learning_rate=1e-2,
+    initial_learning_rate=1e-4,
     decay_steps=10000,
     decay_rate=0.9)
 #optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule)
 
 model.compile(
-    optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+    # 0.001
+    optimizer=tf.keras.optimizers.Adam(learning_rate=lr_schedule),
     # loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-    # loss='categorical_crossentropy',
-    loss=tf.keras.losses.CategoricalCrossentropy(),
+    #loss='binary_crossentropy',
+    #loss=tf.keras.losses.CategoricalCrossentropy(),
+    loss = tf.keras.losses.BinaryCrossentropy(),
     metrics=['acc'])
 
-NUM_EPOCHS = 10
+NUM_EPOCHS = 4
 
 # STEP 7: Fit the model:
 history = model.fit(train_ds,
@@ -278,35 +236,6 @@ history = model.fit(train_ds,
 # STEP 8: Evaluate:
 print(model.evaluate(test_ds))
 
-# lr=0.01
-# Epoch 20/20
-# 112/112 [==============================] - 130s 1s/step - loss: 0.7740 - acc: 0.7400 - val_loss: 1.7613 - val_acc: 0.6005
-# Test loss and acc: [2.276601552963257, 0.578125]
-
-# 40 epochs: lr=0.01
-# Epoch 40/40
-# 112/112 [==============================] - 137s 1s/step - loss: 0.4745 - acc: 0.8419 - val_loss: 2.1517 - val_acc: 0.6188
-# Test: [1.7676501274108887, 0.59375]
-
-
-# 5 epochs, ResnetRs101:
-# Epoch 5/5
-# 112/112 [==============================] - 1047s 9s/step - loss: 0.2722 - acc: 0.9154 - val_loss: 0.5575 - val_acc: 0.8599
-# #[0.48008185625076294, 0.862500011920929]
-
-
-# 5 epochs, ResnetRS152:
-# Epoch 5/5
-# 112/112 [==============================] - 2965s 27s/step - loss: 0.2320 - acc: 0.9232 - val_loss: 0.3929 - val_acc: 0.8871
-# [0.2928621470928192, 0.9312499761581421]
-
-
-# 10 epochs, ResnetRS152:
-# Epoch 10/10
-# 112/112 [==============================] - 1560s 14s/step - loss: 0.0847 - acc: 0.9715 - val_loss: 0.2813 - val_acc: 0.9197
-
-#5/5 [==============================] - 13s 2s/step - loss: 0.3066 - acc: 0.9312
-#[0.3065941631793976, 0.9312499761581421]
 
 # STEP 9: Plot loss and accuracies:
 from matplotlib import pyplot as plt
@@ -330,12 +259,27 @@ plt.show()
 
 
 
-# USE:  https://www.tensorflow.org/tutorials/images/transfer_learning_with_hub
+# 5 epochs, ResNetRS101, adam ,learning_rate=0.001,  fine_tune_at = 90:
+#No
 
-# useful tutorial, another model: https://www.kaggle.com/code/bulentsiyah/dogs-vs-cats-classification-vgg16-fine-tuning
+# FIRST EXPERIMENT:
+# 2 epochs, resnet50 , lr_scheduler with initial lr : 1e-4, fine_tune_at = 45 (with dropout layer):
+# Epoch 2/2
+# 107/107 [==============================] - 344s 3s/step - loss: 0.0282 - acc: 0.9882 - val_loss: 0.1193 - val_acc: 0.9607
 
-# Tutorial using pretrained convnext
-# https://www.kaggle.com/code/shrijeethsuresh/brain-tumor-convnext-44-classes-99-4-acc
+# 5/5 [==============================] - 5s 901ms/step - loss: 0.1313 - acc: 0.9500
+# [0.13128714263439178, 0.949999988079071]
 
-# Tutorial with transfer learning on tumor data: To follow general steps in:
-# https://www.kaggle.com/code/sanandachowdhury/transfer-learning-brain-tumor-classification
+
+# SECOND EXPERIMENT: 98%
+# 4 epochs, resnet50 , lr_scheduler with initial lr : 1e-4, fine_tune_at = 45 (without dropout layer):
+# 107/107 [==============================] - 352s 3s/step - loss: 0.1256 - acc: 0.9484 - val_loss: 0.3344 - val_acc: 0.9173
+# Epoch 2/4
+# 107/107 [==============================] - 355s 3s/step - loss: 0.0267 - acc: 0.9941 - val_loss: 0.0493 - val_acc: 0.9818
+# Epoch 3/4
+# 107/107 [==============================] - 358s 3s/step - loss: 0.0145 - acc: 0.9962 - val_loss: 0.0272 - val_acc: 0.9902
+# Epoch 4/4
+# 107/107 [==============================] - 349s 3s/step - loss: 0.0124 - acc: 0.9965 - val_loss: 0.0370 - val_acc: 0.9888
+
+# 5/5 [==============================] - 5s 921ms/step - loss: 0.0466 - acc: 0.9812
+# [0.04655037075281143, 0.981249988079071]
