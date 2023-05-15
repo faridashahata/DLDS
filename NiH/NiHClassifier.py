@@ -16,7 +16,10 @@ class NiHClassifier(tf.keras.Model):
         self.pretrained_resnet50.trainable = False
 
         self.global_average_pooling = tf.keras.layers.GlobalAveragePooling2D()
-        self.prediction_layer = tf.keras.layers.Dense(self.number_of_output_classes, activation=tf.keras.activations.sigmoid)
+        self.prediction_layer = tf.keras.Sequential([
+            tf.keras.layers.Dense(256, activation='relu'),
+            tf.keras.layers.Dense(self.number_of_output_classes, activation=tf.keras.activations.sigmoid)
+        ])
 
         self.build(input_shape=(None, image_shape[0], image_shape[1], image_shape[2]))
 

@@ -1,5 +1,9 @@
 import os
 
+from datetime import datetime
+
+import json
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -7,8 +11,6 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 
 from typing import *
-
-from datetime import datetime
 
 import argparse
 from NiHClassifier import NiHClassifier
@@ -21,7 +23,7 @@ parser.add_argument('path_to_validation_images', type=str, help='Path to the tra
 parser.add_argument('path_to_training_pkl', type=str, help='Path to the training dataframe.')
 parser.add_argument('path_to_validation_pkl', type=str, help='Path to the validation dataframe.')
 parser.add_argument('path_to_save_models', type=str, help='Path pointing to the location where the models should be saved to.')
-parser.add_argument('path_to_figures', type=str, help='Path pointing to the location where the figures should be saved to.')
+parser.add_argument('path_to_save_history', type=str, help='Path pointing to the location where the history should be saved to.')
 
 parser.add_argument('initial_epochs', type=int, default=10, help='Number of epochs to train just the top layer')
 parser.add_argument('fine_tuning_epochs', type=int, default=10, help='Number of epochs to finetune multiple pretrained layers.')
@@ -72,6 +74,17 @@ def load_dataset(path_to_images: str,
     else:
         dataset = tf.data.Dataset.from_tensor_slices((x, y)).map(read_image).batch(batch_size=batch_size)
     return dataset
+
+
+def save_history(history, path: str):
+    if not os.path.exists(os.path.dirname(path)):
+        os.makedirs(os.path.dirname(path))
+
+    history_dict = history.history
+    # Save it under the form of a json file
+    s = str(history_dict)
+    with open(path, 'w') as file:
+        file.write(s)
 
 
 def plot_loss_acc(history, path: str, model_type: str):
@@ -128,7 +141,7 @@ def main():
     path_to_training_pkl: str = args.path_to_training_pkl
     path_to_validation_pkl: str = args.path_to_validation_pkl
     path_to_save_models: str = args.path_to_save_models
-    path_to_figures: str = args.path_to_figures
+    path_to_save_history: str = args.path_to_save_history
 
     initial_epochs: int = args.initial_epochs
     fine_tuning_epochs: int = args.fine_tuning_epochs
@@ -207,7 +220,8 @@ def main():
                                           callbacks=callbacks)
 
     datetime_str: str = datetime.now().strftime('%Y%H%M%S')
-    plot_loss_acc(training_history, os.path.join(path_to_figures, f'{datetime_str}_model_{model_type}_initial.png'), model_type=model_type)
+    # plot_loss_acc(training_history, os.path.join(path_to_save_history, f'{datetime_str}_model_{model_type}_initial.png'), model_type=model_type)
+    save_history(training_history, path=os.path.join(path_to_save_history, f'{datetime_str}_model_{model_type}_initial.json'))
     nih_classifier.save_weights(os.path.join(path_to_save_models, f'{datetime_str}_model_{model_type}_initial', f'model'))
 
     nih_classifier.unfreeze_top_layers(fine_tune_top_n=fine_tune_at)
@@ -225,7 +239,8 @@ def main():
                                              callbacks=callbacks)
 
     datetime_str: str = datetime.now().strftime('%Y%H%M%S')
-    plot_loss_acc(fine_tuning_history, os.path.join(path_to_figures, f'{datetime_str}_model_{model_type}_{fine_tune_at}_finetuned.png'), model_type=model_type)
+    #plot_loss_acc(fine_tuning_history, os.path.join(path_to_save_history, f'{datetime_str}_model_{model_type}_{fine_tune_at}_finetuned.png'), model_type=model_type)
+    save_history(training_history, path=os.path.join(path_to_save_history, f'{datetime_str}_model_{model_type}_{fine_tune_at}_finetuned.json'))
     nih_classifier.save_weights(os.path.join(path_to_save_models, f'{datetime_str}_model_{model_type}_{fine_tune_at}_finetuned', 'model'))
 
 
