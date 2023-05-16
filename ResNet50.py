@@ -135,10 +135,10 @@ def delete_folders_with_few_images(path_to_training: str, path_to_valid: str):
 #categories_to_remove = delete_folders_with_few_images('training_data_2/','validation_data_2/' )
 
 
-# Run the following lines once (alternatively clear files for different runs/draws of data splits):
-#create_files(train, 'training_data/')
-#create_files(val, 'validation_data/')
-
+# # Run the following lines once (alternatively clear files for different runs/draws of data splits):
+# create_files(train, 'training_data/')
+# create_files(val, 'validation_data/')
+#
 
 # This is to check if a file is empty or not incase we want to either repopulate it or delete its contents for new runs
 # print(os.path.getsize(new_path) == 0)

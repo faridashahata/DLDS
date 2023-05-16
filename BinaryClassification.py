@@ -59,7 +59,7 @@ def store_train_val(data_list, normal_list, train_prop, val_prop, test_prop):
     return train_list, val_list, test_list
 
 
-#train, val, test = store_train_val(data_list, normal_list, 0.8, 0.2, 0.0)
+train, val, test = store_train_val(data_list, normal_list, 0.8, 0.2, 0.0)
 
 #
 # print("len of train", len(train))
@@ -67,7 +67,7 @@ def store_train_val(data_list, normal_list, train_prop, val_prop, test_prop):
 # print("len of test", len(test))
 
 
-# CREATE FIRST FOLDERS: training_data and validation_data:
+# CREATE FIRST FOLDERS: training_data_binary and val_data_binary:
 
 def create_files_binary(file_names, folder_path):
     path_extract = "resized_images/"
@@ -103,8 +103,8 @@ def create_files_binary(file_names, folder_path):
     return
 
 # Run the following lines once (alternatively clear files for different runs/draws of data splits):
-#create_files_binary(train, 'training_data_binary/')
-#create_files_binary(val, 'val_data_binary/')
+create_files_binary(train, 'training_data_binary/')
+create_files_binary(val, 'val_data_binary/')
 
 
 
