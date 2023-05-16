@@ -340,3 +340,14 @@ plt.show()
 
 # Tutorial with transfer learning on tumor data: To follow general steps in:
 # https://www.kaggle.com/code/sanandachowdhury/transfer-learning-brain-tumor-classification
+
+
+
+# FINAL EXPERIMENT:
+# ResnetRS152, 10 epochs,  learning_rate=0.001, fine_tune_at = 700, no scheduler
+
+# 5/5 [==============================] - 13s 3s/step - loss: 0.3033 - acc: 0.9438
+# [0.3032929301261902, 0.9437500238418579]
+#
+# Epoch 10/10
+# 112/112 [==============================] - 472s 4s/step - loss: 0.0491 - acc: 0.9846 - val_loss: 0.2762 - val_acc: 0.9279
