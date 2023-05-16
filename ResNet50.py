@@ -212,19 +212,20 @@ base_model = tf.keras.applications.ResNetRS152(input_shape=(224, 224, 3),
 
 base_model.trainable = True
 
-
-feature_extractor_layer = hub.KerasLayer(
-    feature_extractor_model,
-    #input_shape=(224, 224, 3),
-    trainable=False)
+#
+# feature_extractor_layer = hub.KerasLayer(
+#     feature_extractor_model,
+#     #input_shape=(224, 224, 3),
+#     trainable=False)
 
 
 # feature_extractor_model.summary()
 
 # Fine-tune from this layer onwards
-fine_tune_at = 100
+fine_tune_at = 700
 #fine_tune_at = 70
 
+print("base model layers", len(base_model.layers))
 # Freeze all the layers before the `fine_tune_at` layer
 for layer in base_model.layers[:fine_tune_at]:
     layer.trainable = False

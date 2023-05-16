@@ -177,9 +177,10 @@ base_model.trainable = True
 # feature_extractor_model.summary()
 
 # Fine-tune from this layer onwards
-fine_tune_at = 45
+#fine_tune_at = 45
+fine_tune_at = 130
 #fine_tune_at = 90
-
+print("base model layers", len(base_model.layers))
 # Freeze all the layers before the `fine_tune_at` layer
 for layer in base_model.layers[:fine_tune_at]:
     layer.trainable = False
@@ -226,7 +227,7 @@ model.compile(
     loss = tf.keras.losses.BinaryCrossentropy(),
     metrics=['acc'])
 
-NUM_EPOCHS = 4
+NUM_EPOCHS = 2
 
 # STEP 7: Fit the model:
 history = model.fit(train_ds,
