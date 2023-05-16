@@ -170,3 +170,5 @@ training_data/
 training_data_2/
 validation_data/
 validation_data_2/
+training_data_binary/
+validation_data_binary/
