@@ -180,7 +180,9 @@ print('Number of test batches: %d' %
 # Build Augmentation layer:
 
 augmentation_layer = tf.keras.Sequential([
-    tf.keras.layers.RandomFlip(mode='horizontal')
+    tf.keras.layers.RandomFlip(mode='horizontal'),
+    tf.keras.layers.RandomZoom(0.1),
+    tf.keras.layers.RandomCrop(0.1),
 ], name='augmentation_layer')
 
 
