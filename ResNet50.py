@@ -182,7 +182,7 @@ print('Number of test batches: %d' %
 augmentation_layer = tf.keras.Sequential([
     tf.keras.layers.RandomFlip(mode='horizontal'),
     tf.keras.layers.RandomZoom(0.1),
-    tf.keras.layers.RandomCrop(0.1),
+    #tf.keras.layers.RandomCrop(0.1),
 ], name='augmentation_layer')
 
 
@@ -221,10 +221,13 @@ base_model.trainable = True
 #     trainable=False)
 
 
-# feature_extractor_model.summary()
+base_model.summary()
 
 # Fine-tune from this layer onwards
 fine_tune_at = 700
+#fine_tune_at = 781-10
+
+#771,776
 #fine_tune_at = 70
 
 print("base model layers", len(base_model.layers))
@@ -265,13 +268,13 @@ lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
 #optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule)
 
 model.compile(
-    optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+    optimizer=tf.keras.optimizers.Adam(learning_rate=lr_schedule),
     # loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
     # loss='categorical_crossentropy',
     loss=tf.keras.losses.CategoricalCrossentropy(),
     metrics=['acc'])
 
-NUM_EPOCHS = 10
+NUM_EPOCHS = 20
 
 # STEP 7: Fit the model:
 history = model.fit(train_ds,
