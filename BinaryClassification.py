@@ -103,8 +103,8 @@ def create_files_binary(file_names, folder_path):
     return
 
 # Run the following lines once (alternatively clear files for different runs/draws of data splits):
-create_files_binary(train, 'training_data_binary/')
-create_files_binary(val, 'val_data_binary/')
+# create_files_binary(train, 'training_data_binary/')
+# create_files_binary(val, 'val_data_binary/')
 
 
 
@@ -144,11 +144,20 @@ print('Number of test batches: %d' %
 
 # STEP 3: Normalize data:
 normalization_layer = tf.keras.layers.Rescaling(1./255)
+
 # train_ds = train_ds.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
 # val_ds = validation_data.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
 # test_ds = test_dataset.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
-val_ds = validation_data
-test_ds = test_dataset
+
+# TRY USING PREPROCESS INPUTS:
+train_ds = train_ds.map(lambda x, y: (tf.keras.applications.resnet50.preprocess_input(x), y)) # Where x—images, y—labels.
+val_ds = validation_data.map(lambda x, y: (tf.keras.applications.resnet50.preprocess_input(x), y)) # Where x—images, y—labels.
+test_ds = test_dataset.map(lambda x, y: (tf.keras.applications.resnet50.preprocess_input(x), y)) # Where x—images, y—labels.
+
+
+
+# val_ds = validation_data
+# test_ds = test_dataset
 
 
 
@@ -165,7 +174,9 @@ base_model = tf.keras.applications.resnet50.ResNet50(input_shape=(224, 224, 3),
                                                include_top=False,
                                                weights='imagenet')
 
-base_model.trainable = True
+#base_model.trainable = True
+
+base_model.trainable = False
 
 #
 # feature_extractor_layer = hub.KerasLayer(
@@ -178,12 +189,18 @@ base_model.trainable = True
 
 # Fine-tune from this layer onwards
 #fine_tune_at = 45
-fine_tune_at = 130
+#fine_tune_at = 130
 #fine_tune_at = 90
+
+#fine_tune_at = 130
+
+fine_tune_at = 165
+
+
 print("base model layers", len(base_model.layers))
 # Freeze all the layers before the `fine_tune_at` layer
-for layer in base_model.layers[:fine_tune_at]:
-    layer.trainable = False
+# for layer in base_model.layers[:fine_tune_at]:
+#     layer.trainable = False
 
 global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
 
@@ -218,21 +235,33 @@ lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
     decay_rate=0.9)
 #optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule)
 
+# Define Early Stopping Callback
+earlystopping_callback = tf.keras.callbacks.EarlyStopping(
+    monitor='val_loss',
+    patience=3)
+callbacks_list = [earlystopping_callback]
+
+
+
 model.compile(
     # 0.001
-    optimizer=tf.keras.optimizers.Adam(learning_rate=lr_schedule),
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
     # loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
     #loss='binary_crossentropy',
     #loss=tf.keras.losses.CategoricalCrossentropy(),
     loss = tf.keras.losses.BinaryCrossentropy(),
     metrics=['acc'])
 
-NUM_EPOCHS = 2
+NUM_EPOCHS = 10
+CFG_SEED=71
+tf.random.set_seed(CFG_SEED)
+
 
 # STEP 7: Fit the model:
 history = model.fit(train_ds,
                     validation_data=val_ds,
                    epochs=NUM_EPOCHS)
+                    #, callbacks=callbacks_list)
 
 # STEP 8: Evaluate:
 print(model.evaluate(test_ds))
