@@ -188,6 +188,7 @@ augmentation_layer = tf.keras.Sequential(
     [
         tf.keras.layers.RandomFlip(mode="horizontal"),
         tf.keras.layers.RandomZoom(0.1),
+        # tf.keras.layers.RandomCrop(0.1),
     ],
     name="augmentation_layer",
 )
@@ -234,10 +235,13 @@ base_model.trainable = True
 #     trainable=False)
 
 
-# feature_extractor_model.summary()
+base_model.summary()
 
 # Fine-tune from this layer onwards
-fine_tune_at = 200
+fine_tune_at = 700
+# fine_tune_at = 781-10
+
+# 771,776
 # fine_tune_at = 70
 
 print("base model layers", len(base_model.layers))
@@ -291,9 +295,7 @@ model.compile(
     metrics=["accuracy"],
 )
 
-NUM_EPOCHS = 30
-
-early_stoppage = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3, min_delta=0.01)
+NUM_EPOCHS = 20
 
 # STEP 7: Fit the model:
 history = model.fit(
