@@ -1,11 +1,7 @@
 import os
-
 from tqdm import tqdm
-
 import cv2
-
 from typing import *
-
 import argparse
 
 parser = argparse.ArgumentParser('Resize all images to 224x224 given a path')
@@ -20,6 +16,8 @@ def resize_all_image_in_path(path: str, resized_path: str = './data/resized_imag
     if not os.path.exists(resized_path):
         os.makedirs(resized_path)
 
+    data_list = []
+
     files: List[str] = os.listdir(path)
 
     for file_name in tqdm(files):
@@ -32,6 +30,12 @@ def resize_all_image_in_path(path: str, resized_path: str = './data/resized_imag
             image = cv2.imread(original_file_path)
             resized_img = cv2.resize(image, dsize=(224, 224))
             cv2.imwrite(new_file_path, resized_img)
+
+            data_list.append([image, file_name])
+
+    with open('data_list.txt', 'w') as f:
+        for item in data_list:
+            f.write(f"{item[0]};{item[1]}\n")
 
 
 def main():
