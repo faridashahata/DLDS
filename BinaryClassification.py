@@ -4,12 +4,10 @@ import numpy as np
 import os
 from PIL import Image
 import cv2
-#import tf.models as tfm
-#import tensorflow_models as tfm
 import tensorflow_hub as hub
 from typing import *
 from tqdm import tqdm
-import shutil
+
 
 data_list = []
 normal_list = []
@@ -61,10 +59,6 @@ def store_train_val(data_list, normal_list, train_prop, val_prop, test_prop):
 
 train, val, test = store_train_val(data_list, normal_list, 0.8, 0.2, 0.0)
 
-#
-# print("len of train", len(train))
-# print("len of val", len(val))
-# print("len of test", len(test))
 
 
 # CREATE FIRST FOLDERS: training_data_binary and val_data_binary:
@@ -72,7 +66,6 @@ train, val, test = store_train_val(data_list, normal_list, 0.8, 0.2, 0.0)
 def create_files_binary(file_names, folder_path):
     path_extract = "resized_images/"
     filenames = os.listdir(path_extract)
-    #new_path = 'training_data/'
     new_path = folder_path
 
     # instead of file_names, put train, val or test:
@@ -143,74 +136,45 @@ print('Number of test batches: %d' %
 
 
 # STEP 3: Normalize data:
-normalization_layer = tf.keras.layers.Rescaling(1./255)
 
-# train_ds = train_ds.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
-# val_ds = validation_data.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
-# test_ds = test_dataset.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
-
-# TRY USING PREPROCESS INPUTS:
+# USE PREPROCESS INPUTS:
 train_ds = train_ds.map(lambda x, y: (tf.keras.applications.resnet50.preprocess_input(x), y)) # Where x—images, y—labels.
 val_ds = validation_data.map(lambda x, y: (tf.keras.applications.resnet50.preprocess_input(x), y)) # Where x—images, y—labels.
 test_ds = test_dataset.map(lambda x, y: (tf.keras.applications.resnet50.preprocess_input(x), y)) # Where x—images, y—labels.
 
 
 
-# val_ds = validation_data
-# test_ds = test_dataset
+# STEP 4: Get pre-trained models:
 
-
-
-# STEP 4: Get pre-trained models from this link:
-mobilenet_v2 = "https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification/4"
-inception_v3 = "https://tfhub.dev/google/imagenet/inception_v3/classification/5"
-resnet50 = "https://tfhub.dev/tensorflow/resnet_50/classification/1"
-resnet50_v2 = 'https://tfhub.dev/google/imagenet/resnet_v2_50/classification/5'
 IMAGE_SHAPE = (224, 224)
 
-#feature_extractor_model = resnet50
 #ResNetRS152
 base_model = tf.keras.applications.resnet50.ResNet50(input_shape=(224, 224, 3),
                                                include_top=False,
                                                weights='imagenet')
 
-#base_model.trainable = True
+base_model.trainable = True
 
-base_model.trainable = False
-
-#
-# feature_extractor_layer = hub.KerasLayer(
-#     feature_extractor_model,
-#     #input_shape=(224, 224, 3),
-#     trainable=False)
-
-
-# feature_extractor_model.summary()
-
-# Fine-tune from this layer onwards
-#fine_tune_at = 45
-#fine_tune_at = 130
-#fine_tune_at = 90
-
-#fine_tune_at = 130
-
-fine_tune_at = 165
-
+# Set trainable parameter to false if we wish not to unfreeze any additional layers:
+#base_model.trainable = False
 
 print("base model layers", len(base_model.layers))
+
+# Fine-tune from this layer onwards
+
+fine_tune_at = 130
+
+
 # Freeze all the layers before the `fine_tune_at` layer
-# for layer in base_model.layers[:fine_tune_at]:
-#     layer.trainable = False
+for layer in base_model.layers[:fine_tune_at]:
+    layer.trainable = False
 
 global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
 
 
 # STEP 5: Build Model:
 num_classes = len(class_names)
-#initializer = tf.keras.initializers.GlorotNormal(seed=31)
 
-# preprocess_input = tf.keras.applications.resnet50.preprocess_input
-#x = preprocess_input(train_ds)
 
 model = tf.keras.Sequential([
     tf.keras.layers.Input(shape=(224, 224, 3),
@@ -218,7 +182,7 @@ model = tf.keras.Sequential([
     # feature_extractor_layer,
     base_model,
     global_average_layer,
-    #tf.keras.layers.Dropout(0.5),
+    #tf.keras.layers.Dropout(0.2),
     #tf.keras.layers.Dense(512, activation='relu'),
     tf.keras.layers.Dense(256, activation='relu'),
 
@@ -233,7 +197,8 @@ lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
     initial_learning_rate=1e-4,
     decay_steps=10000,
     decay_rate=0.9)
-#optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule)
+
+
 
 # Define Early Stopping Callback
 earlystopping_callback = tf.keras.callbacks.EarlyStopping(
@@ -246,9 +211,6 @@ callbacks_list = [earlystopping_callback]
 model.compile(
     # 0.001
     optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
-    # loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-    #loss='binary_crossentropy',
-    #loss=tf.keras.losses.CategoricalCrossentropy(),
     loss = tf.keras.losses.BinaryCrossentropy(),
     metrics=['acc'])
 
@@ -262,6 +224,7 @@ history = model.fit(train_ds,
                     validation_data=val_ds,
                    epochs=NUM_EPOCHS)
                     #, callbacks=callbacks_list)
+
 
 # STEP 8: Evaluate:
 print(model.evaluate(test_ds))
@@ -289,10 +252,7 @@ plt.show()
 
 
 
-# 5 epochs, ResNetRS101, adam ,learning_rate=0.001,  fine_tune_at = 90:
-#No
-
-# FIRST EXPERIMENT:
+# FIRST EXPERIMENT: 95% test accuracy
 # 2 epochs, resnet50 , lr_scheduler with initial lr : 1e-4, fine_tune_at = 45 (with dropout layer):
 # Epoch 2/2
 # 107/107 [==============================] - 344s 3s/step - loss: 0.0282 - acc: 0.9882 - val_loss: 0.1193 - val_acc: 0.9607
@@ -301,7 +261,7 @@ plt.show()
 # [0.13128714263439178, 0.949999988079071]
 
 
-# SECOND EXPERIMENT: 98%
+# SECOND EXPERIMENT: 98% test accuracy
 # 4 epochs, resnet50 , lr_scheduler with initial lr : 1e-4, fine_tune_at = 45 (without dropout layer):
 # 107/107 [==============================] - 352s 3s/step - loss: 0.1256 - acc: 0.9484 - val_loss: 0.3344 - val_acc: 0.9173
 # Epoch 2/4
