@@ -50,11 +50,8 @@ val_ds = validation_data
 test_ds = test_dataset
 
 
-# STEP 4: Get EfficientNet V2 from this link:
-model_link = 'https://tfhub.dev/google/imagenet/efficientnet_v2_imagenet21k_b0/feature_vector/2'
-#model_layer = hub.KerasLayer(model_link, trainable=False)
+# STEP 4: Get EfficientNet V2 and ConvNeXtSmall:
 
-#
 # base_model = tf.keras.applications.efficientnet_v2.EfficientNetV2B1(input_shape=(224, 224, 3),
 #                                                include_top=False,
 #                                                weights='imagenet')
@@ -67,19 +64,20 @@ base_model = tf.keras.applications.convnext.ConvNeXtSmall(input_shape=(224, 224,
 base_model.trainable = True
 
 fine_tune_at = 250
-#295 convnext small
+#total layers: 295 convnext small
 
 print("base model layers", len(base_model.layers))
+
 # Freeze all the layers before the `fine_tune_at` layer
 for layer in base_model.layers[:fine_tune_at]:
      layer.trainable = False
 
-
 global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
+
+
 # STEP 5: Generate Model:
 model = tf.keras.Sequential([
         tf.keras.layers.Input(shape=(224, 224, 3), dtype=tf.float32, name='input_image'),
-        #model_layer,
         base_model,
         global_average_layer,
         tf.keras.layers.Dropout(0.2),
@@ -110,27 +108,7 @@ history = model.fit(train_ds,
 
 
 # STEP 8: Evaluate:
-# lr=0.001
-# After 10 epochs:  loss: 0.3545 - acc: 0.8822 - val_loss: 0.7879 - val_acc: 0.7911
-
 print(model.evaluate(test_ds))
-
-
-# Epoch 20/20 lr=0.001
-# 112/112 [==============================]
-# - 35s 312ms/step - loss: 0.1299 - acc: 0.9542 - val_loss: 0.6327 - val_acc: 0.8146
-
-# After 20 epochs on test: lr=0.001
-# 2/2 [==============================] - 1s 290ms/step - loss: 0.6322 - acc: 0.7812
-# [0.6321812272071838, 0.78125]
-
-#------------------------------------------------------------------------------------
-# After 30 epochs on test: lr=0.001:
-# Epoch 30/30
-# 112/112 [==============================] - 36s 325ms/step - loss: 0.1117 - acc: 0.9615 - val_loss: 0.6393 - val_acc: 0.8433
-# 2/2 [==============================] - 1s 291ms/step - loss: 0.2503 - acc: 0.9062
-# [0.2502741813659668, 0.90625]
-
 
 
 # STEP 9: Plot loss and accuracies:
@@ -152,9 +130,29 @@ plt.xlabel('epoch')
 plt.legend(['train', 'val'], loc='upper left')
 plt.show()
 
+
+
+# EfficientNet, Epoch 20/20 lr=0.001:
+
+# 112/112 [==============================]
+# - 35s 312ms/step - loss: 0.1299 - acc: 0.9542 - val_loss: 0.6327 - val_acc: 0.8146
+
+# After 20 epochs on test: lr=0.001
+# 2/2 [==============================] - 1s 290ms/step - loss: 0.6322 - acc: 0.7812
+# Test Loss and Acc: [0.6321812272071838, 0.78125]
+
+#------------------------------------------------------------------------------------
+# After 30 epochs on test: lr=0.001:
+# Epoch 30/30
+# 112/112 [==============================] - 36s 325ms/step - loss: 0.1117 - acc: 0.9615 - val_loss: 0.6393 - val_acc: 0.8433
+# 2/2 [==============================] - 1s 291ms/step - loss: 0.2503 - acc: 0.9062
+# Test Loss and Acc: [0.2502741813659668, 0.90625]
+
+
+
 # 50 epochs, 320, EfficientNetV2B1, augmentation layer, 0.0001
 # 5/5 [==============================] - 2s 446ms/step - loss: 0.2520 - accuracy: 0.9062
-# [0.2519591450691223, 0.90625]
+# Test Loss and Acc: [0.2519591450691223, 0.90625]
 
 
 # 80 epochs, EfficientNetV2B1, augmentation layer, 0.0001:
@@ -654,7 +652,7 @@ plt.show()
 # ms / step - loss: 0.0491 - accuracy: 0.9855 - val_loss: 0.2354 - val_accuracy: 0.9429
 #
 # 5 / 5[== == == == == == == == == == == == == == ==] - 2s 420ms / step - loss: 0.1591 - accuracy: 0.9625
-# [0.15908123552799225, 0.9624999761581421]
+# Test Loss and Acc: [0.15908123552799225, 0.9624999761581421]
 
 
 # Convnext 0.0001, 10 epochs:
@@ -666,4 +664,4 @@ plt.show()
 # 20 epochs, lr scheduler, same as above:
 #
 # 5/5 [==============================] - 48s 10s/step - loss: 0.3464 - accuracy: 0.8938
-# [0.34639063477516174, 0.893750011920929]
+# Test Loss and Acc: [0.34639063477516174, 0.893750011920929]

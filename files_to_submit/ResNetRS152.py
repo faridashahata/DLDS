@@ -72,7 +72,6 @@ print("len of test", len(test))
 def create_files(file_names, folder_path):
     path_extract = "resized_images/"
     filenames = os.listdir(path_extract)
-    #new_path = 'training_data/'
     new_path = folder_path
 
     # instead of file_names, put train, val or test:
@@ -97,52 +96,10 @@ def create_files(file_names, folder_path):
 
     return
 
-# Run this on a newly created training data folder:
-
-
-def delete_folders_with_few_images(path_to_training: str, path_to_valid: str):
-    categories_to_remove = []
-    if not os.path.exists(path_to_training):
-        print('Path does not exist')
-
-    folders: List[str] = os.listdir(path_to_training)
-
-    for folder_name in tqdm(folders):
-        folder_name: str
-
-        folder_path: str = os.path.join(path_to_training, folder_name)
-
-        if os.path.isdir(folder_path):
-            files: List[str] = os.listdir(folder_path)
-            #print("len files", len(files))
-            if len(files) < 20:
-
-                # os.rmdir(folder_path)
-
-                shutil.rmtree(folder_path, ignore_errors=True)
-                categories_to_remove.append(folder_name)
-
-    folders_in_val = os.listdir(path_to_valid)
-    for folder_name in tqdm(folders):
-        if folder_name in categories_to_remove:
-            folder_path = os.path.join(path_to_valid, folder_name)
-            # os.rmdir(folder_path)
-            shutil.rmtree(folder_path, ignore_errors=True)
-    print("categories to remove", categories_to_remove)
-    return
-
-
-#categories_to_remove = delete_folders_with_few_images('training_data_2/','validation_data_2/' )
-
 
 # # Run the following lines once (alternatively clear files for different runs/draws of data splits):
 # create_files(train, 'training_data/')
 # create_files(val, 'validation_data/')
-#
-
-# This is to check if a file is empty or not incase we want to either repopulate it or delete its contents for new runs
-# print(os.path.getsize(new_path) == 0)
-# print(len(os.listdir(new_path)))
 
 
 # STEP 1: Read data from directory:
@@ -188,77 +145,49 @@ augmentation_layer = tf.keras.Sequential([
 
 # STEP 3: Normalize data:
 normalization_layer = tf.keras.layers.Rescaling(1./255)
-#train_ds = train_ds.map(lambda x, y: (augmentation_layer(x), y)) # Where x—images, y—labels.
-# val_ds = validation_data.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
-# test_ds = test_dataset.map(lambda x, y: (normalization_layer(x), y)) # Where x—images, y—labels.
+
 val_ds = validation_data
 test_ds = test_dataset
 
-AUTOTUNE = tf.data.AUTOTUNE
-#train_ds = train_ds.cache().prefetch(buffer_size=AUTOTUNE)
-#val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
-
 
 # STEP 4: Get pre-trained models from this link:
-mobilenet_v2 = "https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification/4"
-inception_v3 = "https://tfhub.dev/google/imagenet/inception_v3/classification/5"
-resnet50 = "https://tfhub.dev/tensorflow/resnet_50/classification/1"
-resnet50_v2 = 'https://tfhub.dev/google/imagenet/resnet_v2_50/classification/5'
-IMAGE_SHAPE = (224, 224)
 
-feature_extractor_model = resnet50
-#ResNetRS152
 base_model = tf.keras.applications.ResNetRS152(input_shape=(224, 224, 3),
                                                include_top=False,
                                                weights='imagenet')
 
+base_model.trainable = True
+#base_model.trainable = False
 
-#base_model.trainable = True
-base_model.trainable = False
-
-#
-# feature_extractor_layer = hub.KerasLayer(
-#     feature_extractor_model,
-#     #input_shape=(224, 224, 3),
-#     trainable=False)
-
-
-#base_model.summary()
 
 # Fine-tune from this layer onwards
 #fine_tune_at = 700
 fine_tune_at = 1400
-#fine_tune_at = 781-10
 
-#771,776
-#fine_tune_at = 70
 
 print("base model layers", len(base_model.layers))
+
 # Freeze all the layers before the `fine_tune_at` layer
-# for layer in base_model.layers[:fine_tune_at]:
-#     layer.trainable = False
-#
-# Unfreeze BN layers to see the difference:
-counter = 0
-for layer in base_model.layers:
-    if isinstance(layer, tf.keras.layers.BatchNormalization):
-        counter +=1
-        layer.trainable = True
-print(f"Make {counter} BN layers unfrozen")
+for layer in base_model.layers[:fine_tune_at]:
+    layer.trainable = False
+
+# Unfreeze BN layers to see the difference: This is just to examine BN layer difference:
+# counter = 0
+# for layer in base_model.layers:
+#     if isinstance(layer, tf.keras.layers.BatchNormalization):
+#         counter +=1
+#         layer.trainable = True
+# print(f"Make {counter} BN layers unfrozen")
+
 global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
 
 
 # STEP 5: Build Model:
 num_classes = len(class_names)
-#initializer = tf.keras.initializers.GlorotNormal(seed=31)
-
-# preprocess_input = tf.keras.applications.resnet50.preprocess_input
-#x = preprocess_input(train_ds)
 
 model = tf.keras.Sequential([
     tf.keras.layers.Input(shape=(224, 224, 3),
                           dtype=tf.float32, name='input_image'),
-    # feature_extractor_layer,
     base_model,
     global_average_layer,
     tf.keras.layers.Dropout(0.2),
@@ -268,18 +197,18 @@ model = tf.keras.Sequential([
         num_classes, dtype=tf.float32, activation='softmax')
 ])
 
-#model.summary()
 
 # STEP 6: Compile the model:
 lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
     initial_learning_rate=1e-2,
     decay_steps=10000,
     decay_rate=0.9)
-#optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule)
+
 
 CFG_SEED=71
 NUM_EPOCHS = 10
-#tf.random.set_seed(CFG_SEED)
+tf.random.set_seed(CFG_SEED)
+
 
 # Define Early Stopping Callback
 earlystopping_callback = tf.keras.callbacks.EarlyStopping(
@@ -288,15 +217,10 @@ earlystopping_callback = tf.keras.callbacks.EarlyStopping(
 callbacks_list = [earlystopping_callback]
 
 
-# Try AdamW and lr sched
 model.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
-
-    # loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-    # loss='categorical_crossentropy',
     loss=tf.keras.losses.CategoricalCrossentropy(),
     metrics=['acc'])
-
 
 
 # STEP 7: Fit the model:
@@ -308,6 +232,10 @@ history = model.fit(train_ds,
 
 # STEP 8: Evaluate:
 print(model.evaluate(test_ds))
+
+
+
+
 
 # lr=0.01
 # Epoch 20/20
@@ -361,19 +289,8 @@ plt.show()
 
 
 
-# USE:  https://www.tensorflow.org/tutorials/images/transfer_learning_with_hub
-
-# useful tutorial, another model: https://www.kaggle.com/code/bulentsiyah/dogs-vs-cats-classification-vgg16-fine-tuning
-
-# Tutorial using pretrained convnext
-# https://www.kaggle.com/code/shrijeethsuresh/brain-tumor-convnext-44-classes-99-4-acc
-
-# Tutorial with transfer learning on tumor data: To follow general steps in:
-# https://www.kaggle.com/code/sanandachowdhury/transfer-learning-brain-tumor-classification
-
-
-
 # FINAL EXPERIMENT:
+
 # ResnetRS152, 10 epochs,  learning_rate=0.001, fine_tune_at = 700, no scheduler
 
 # 5/5 [==============================] - 13s 3s/step - loss: 0.3033 - acc: 0.9438
@@ -405,10 +322,7 @@ plt.show()
 # 112/112 [==============================] - 460s 4s/step - loss: 0.0832 - acc: 0.9693 - val_loss: 0.4346 - val_acc: 0.8966
 # Epoch 10/10
 # 112/112 [==============================] - 458s 4s/step - loss: 0.0645 - acc: 0.9791 - val_loss: 0.5021 - val_acc: 0.8898
-# 2023-05-17 20:24:57.738757: I tensorflow/core/common_runtime/executor.cc:1210] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_4' with dtype int32 and shape [895]
-# 	 [[{{node Placeholder/_4}}]]
-# 2023-05-17 20:24:57.739198: I tensorflow/core/common_runtime/executor.cc:1210] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_4' with dtype int32 and shape [895]
-# 	 [[{{node Placeholder/_4}}]]
+
 # 5/5 [==============================] - 13s 2s/step - loss: 0.4373 - acc: 0.8875
 # [0.4372937083244324, 0.887499988079071]
 
@@ -492,10 +406,7 @@ plt.show()
 # 112/112 [==============================] - 461s 4s/step - loss: 0.1736 - acc: 0.9481 - val_loss: 0.5117 - val_acc: 0.8844
 # Epoch 20/20
 # 112/112 [==============================] - 450s 4s/step - loss: 0.1809 - acc: 0.9439 - val_loss: 0.4510 - val_acc: 0.9007
-# 2023-05-18 14:07:09.816576: I tensorflow/core/common_runtime/executor.cc:1210] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype string and shape [895]
-# 	 [[{{node Placeholder/_0}}]]
-# 2023-05-18 14:07:09.816800: I tensorflow/core/common_runtime/executor.cc:1210] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_4' with dtype int32 and shape [895]
-# 	 [[{{node Placeholder/_4}}]]
+
 # 5/5 [==============================] - 13s 3s/step - loss: 0.2285 - acc: 0.9438
 # [0.22845391929149628, 0.9437500238418579]
 
