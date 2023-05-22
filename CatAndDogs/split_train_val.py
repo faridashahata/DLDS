@@ -23,7 +23,7 @@ def save_data(df: pd.DataFrame, path: str):
 
 
 def label_to_one_hot(df: pd.DataFrame) -> pd.DataFrame:
-    breed = df['breed']
+    breed = df['id']
 
     max_label: int = np.max(breed)
     one_hot_labels: List[np.array] = []
@@ -34,7 +34,7 @@ def label_to_one_hot(df: pd.DataFrame) -> pd.DataFrame:
 
         one_hot_labels.append(one_hot)
 
-    df['breed_onehot'] = one_hot_labels
+    df['id_onehot'] = one_hot_labels
 
     return df
 

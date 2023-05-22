@@ -13,9 +13,9 @@ import tensorflow as tf
 from typing import *
 
 import argparse
-from NiHClassifier import NiHClassifier
+from CatsAndDogsClassifier import CatsAndDogsClassifier
 
-parser = argparse.ArgumentParser('Training and fine-tuning a resnet for the NiH Lung dataset')
+parser = argparse.ArgumentParser('Training and fine-tuning a resnet for the Cats and Dogs dataset')
 parser.add_argument('model_type', type=str, default='Binary', help='Type of model that you want to fine-tune. '
                                                                    'Either \'Binary\' or \'Multi\'')
 parser.add_argument('path_to_training_images', type=str, help='Path to the training images')
@@ -39,12 +39,20 @@ def read_image_data_augmentation(file_path, label):
     image = tf.image.decode_image(image, channels=3, dtype=tf.float32)
     if tf.random.uniform(shape=[]) > 0.5:
         image = tf.image.flip_left_right(image)
+
+    image = tf.image.random_brightness(image, max_delta=0.05)
+    image = tf.image.random_saturation(image, lower=0.5, upper=1.5)
+
+    image = tf.image.resize_with_crop_or_pad(image, target_width=224, target_height=224)
+    image = tf.image.per_image_standardization(image)
     return image, label
 
 
 def read_image(file_path, label):
     image = tf.io.read_file(file_path)
     image = tf.image.decode_image(image, channels=3, dtype=tf.float32)
+    image = tf.image.resize_with_crop_or_pad(image, target_width=224, target_height=224)
+    image = tf.image.per_image_standardization(image)
     return image, label
 
 
@@ -59,17 +67,22 @@ def load_dataset(path_to_images: str,
                  path_to_pkl: str,
                  model_type: str,
                  batch_size: int,
+                 data_type: str = 'train',
                  data_augmentation: bool = False) -> tf.data.Dataset:
     df = pd.read_pickle(path_to_pkl)
-    df['Image Index'] = path_to_images + df['Image Index']
+    df['file_name'] = path_to_images + df['file_name'] + '.jpg'
 
-    x = df['Image Index'].values
+    x = df['file_name'].values
     if model_type == "Binary":
-        y = df['No Finding'].values
-    else:
-        y = np.stack(df['multi_category_labels'].values)
+        initial_values = df['species'].values - 1
+        y = np.zeros((len(initial_values), 2), dtype=int)
 
-    if data_augmentation:
+        for i, val in enumerate(initial_values):
+            y[i, val] = 1
+    else:
+        y = np.stack(df['id_onehot'].values)
+
+    if data_augmentation and data_type == 'train':
         dataset = tf.data.Dataset.from_tensor_slices((x, y)).map(read_image_data_augmentation).batch(batch_size=batch_size)
     else:
         dataset = tf.data.Dataset.from_tensor_slices((x, y)).map(read_image).batch(batch_size=batch_size)
@@ -170,37 +183,31 @@ def main():
         os.makedirs(path_to_save_models)
 
 
-    label_classes: List[str] = ['No Finding', 'Atelectasis', 'Consolidation', 'Infiltration', 'Pneumothorax', 'Edema',
-                                'Emphysema', 'Fibrosis', 'Effusion', 'Pneumonia', 'Pleural_Thickening', 'Cardiomegaly',
-                                'Nodule', 'Mass', 'Hernia']
-
     training_dataset: tf.data.Dataset = load_dataset(path_to_images=path_to_training_images,
                                                      path_to_pkl=path_to_training_pkl,
                                                      model_type=model_type,
                                                      batch_size=batch_size,
+                                                     data_type='train',
                                                      data_augmentation=augment)
     validation_dataset: tf.data.Dataset = load_dataset(path_to_images=path_to_validation_images,
                                                        path_to_pkl=path_to_validation_pkl,
                                                        model_type=model_type,
-                                                       batch_size=batch_size)
+                                                       batch_size=batch_size,
+                                                       data_type='val')
 
-    number_of_output_classes: int = 1 if model_type == 'Binary' else 15
+    number_of_output_classes: int = 2 if model_type == 'Binary' else 37
 
     loss: tf.keras.losses
-    metric: List[tf.keras.metrics]
+    metric: List[tf.keras.metrics] = ['accuracy']
     if model_type == 'Binary':
-        loss = tf.keras.losses.BinaryCrossentropy()
-        metric = ['accuracy']
+        loss = tf.keras.losses.CategoricalCrossentropy()
     else:
         loss = tf.keras.losses.CategoricalCrossentropy()
-        metric = [tf.keras.metrics.AUC()]
 
     callbacks = []
-    if lr_scheduler:
-        callback_scheduler = tf.keras.callbacks.LearningRateScheduler(scheduler)
-        callbacks.append(callback_scheduler)
+    lr_sched = lr
 
-    monitor: str = 'val_accuracy' if model_type == 'Binary' else 'val_auc'
+    monitor: str = 'val_accuracy'
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=os.path.join(path_to_save_models, 'checkpoints'),
         save_weights_only=True,
@@ -209,39 +216,47 @@ def main():
         save_best_only=True)
     callbacks.append(model_checkpoint_callback)
 
-    nih_classifier: NiHClassifier = NiHClassifier(number_of_output_classes=number_of_output_classes)
-    nih_classifier.compile(optimizer=tf.keras.optimizers.Adam(lr),
-                           loss=loss,
-                           metrics=metric)
+    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=7)
+    callbacks.append(early_stopping)
 
-    training_history = nih_classifier.fit(training_dataset,
-                                          epochs=initial_epochs,
-                                          validation_data=validation_dataset,
-                                          callbacks=callbacks)
+    cats_and_dogs_classifier: CatsAndDogsClassifier = CatsAndDogsClassifier(number_of_output_classes=number_of_output_classes)
+    cats_and_dogs_classifier.compile(optimizer=tf.keras.optimizers.Adam(lr_sched),
+                                     loss=loss,
+                                     metrics=metric)
+
+    training_history = cats_and_dogs_classifier.fit(training_dataset,
+                                                    epochs=initial_epochs,
+                                                    validation_data=validation_dataset,
+                                                    callbacks=callbacks)
 
     datetime_str: str = datetime.now().strftime('%Y%H%M%S')
     # plot_loss_acc(training_history, os.path.join(path_to_save_history, f'{datetime_str}_model_{model_type}_initial.png'), model_type=model_type)
     save_history(training_history, path=os.path.join(path_to_save_history, f'{datetime_str}_model_{model_type}_initial.json'))
-    nih_classifier.save_weights(os.path.join(path_to_save_models, f'{datetime_str}_model_{model_type}_initial', f'model'))
+    cats_and_dogs_classifier.save_weights(os.path.join(path_to_save_models, f'{datetime_str}_model_{model_type}_initial', f'model'))
 
-    nih_classifier.unfreeze_top_layers(fine_tune_top_n=fine_tune_at)
+    cats_and_dogs_classifier.unfreeze_top_layers(fine_tune_top_n=fine_tune_at)
 
-    nih_classifier.compile(optimizer=tf.keras.optimizers.Adam(lr/10),
-                           loss=loss,
-                           metrics=metric)
+    if lr_scheduler:
+        lr_sched = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=lr,
+                                                                  decay_rate=0.9,
+                                                                  decay_steps=500)
+
+    cats_and_dogs_classifier.compile(optimizer=tf.keras.optimizers.Adam(lr_sched),
+                                     loss=loss,
+                                     metrics=metric)
 
     total_epochs = initial_epochs + fine_tuning_epochs
 
-    fine_tuning_history = nih_classifier.fit(training_dataset,
-                                             epochs=total_epochs,
-                                             initial_epoch=training_history.epoch[-1],
-                                             validation_data=validation_dataset,
-                                             callbacks=callbacks)
+    fine_tuning_history = cats_and_dogs_classifier.fit(training_dataset,
+                                                       epochs=total_epochs,
+                                                       initial_epoch=training_history.epoch[-1],
+                                                       validation_data=validation_dataset,
+                                                       callbacks=callbacks)
 
     datetime_str: str = datetime.now().strftime('%Y%H%M%S')
     #plot_loss_acc(fine_tuning_history, os.path.join(path_to_save_history, f'{datetime_str}_model_{model_type}_{fine_tune_at}_finetuned.png'), model_type=model_type)
-    save_history(training_history, path=os.path.join(path_to_save_history, f'{datetime_str}_model_{model_type}_{fine_tune_at}_finetuned.json'))
-    nih_classifier.save_weights(os.path.join(path_to_save_models, f'{datetime_str}_model_{model_type}_{fine_tune_at}_finetuned', 'model'))
+    save_history(fine_tuning_history, path=os.path.join(path_to_save_history, f'{datetime_str}_model_{model_type}_{fine_tune_at}_finetuned.json'))
+    cats_and_dogs_classifier.save_weights(os.path.join(path_to_save_models, f'{datetime_str}_model_{model_type}_{fine_tune_at}_finetuned', 'model'))
 
 
 if __name__ == '__main__':
