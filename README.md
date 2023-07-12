@@ -53,5 +53,7 @@ The general script for fine-tuning the Vision Transformer can be found in: `VIT.
 
 ## References:
 https://www.kaggle.com/datasets/nih-chest-xrays/data
+
 https://www.kaggle.com/datasets/fernando2rad/brain-tumor-mri-images-44c
+
 https://www.kaggle.com/code/sanandachowdhury/transfer-learning-brain-tumor-classification
